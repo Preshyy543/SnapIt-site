@@ -27,19 +27,20 @@
     #video {
       display: block;
       margin: 70px auto 0 auto;
-      max-width: 540px;
+      max-width: 400px;
       width: 100%;
       border: 6px solid #a49188;
       border-radius: 14px;
       background: #392208;
       transform: scaleX(-1);
+      transition: filter 0.3s ease;
     }
 
     #countdown {
       font-size: 60px;
       font-weight: bold;
       position: absolute;
-      top: 50%;
+      top: 68px;
       left: 50%;
       transform: translate(-50%, -50%);
       color: #302c2c;
@@ -52,7 +53,7 @@
       bottom: 0;
       transform: translateX(-50%);
       display: flex;
-      flex-wrap: nowrap;
+      flex-wrap: wrap;
       justify-content: center;
       gap: 12px;
       background: rgba(87, 58, 35, 0.95);
@@ -67,7 +68,7 @@
     #controls input,
     #controls button {
       font-family: 'Poppins', sans-serif;
-      font-size: 10px;
+      font-size: 1rem;
       padding: 8px 15px;
       border-radius: 10px;
       border: 1px solid #d8c3b0;
@@ -96,7 +97,7 @@
 
     #cameraImg {
       display: block;
-      margin: 1px auto;
+      margin: 20px auto;
       width: 700px;
       max-width: 80%;
     }
@@ -105,7 +106,6 @@
       display: none;
       position: relative;
       margin: 60px auto 20px auto;
-      width: auto;
       max-width: 100%;
       flex-direction: column;
       align-items: center;
@@ -161,8 +161,11 @@
       <option value="sepia">Sepia</option>
       <option value="grayscale">Grayscale</option>
       <option value="vintage">Vintage</option>
+      <option value="cool">Cool</option>
       <option value="warm">Warm</option>
     </select>
+
+    <button onclick="resetFilter()">Reset Filter</button>
 
     <label for="framesSelect">Frames</label>
     <select id="framesSelect">
@@ -209,9 +212,19 @@
         case 'sepia': return 'sepia(60%)';
         case 'grayscale': return 'grayscale(90%)';
         case 'vintage': return 'contrast(0.8) saturate(0.8) sepia(0.4)';
+        case 'cool': return 'brightness(1.2) hue-rotate(180deg)';
         case 'warm': return 'brightness(1.1) sepia(0.2) saturate(1.5)';
         default: return 'none';
       }
+    }
+
+    filterSelect.addEventListener('change', () => {
+      video.style.filter = getCssFilter(filterSelect.value);
+    });
+
+    function resetFilter() {
+      filterSelect.value = 'none';
+      video.style.filter = 'none';
     }
 
     function capturePhoto() {
@@ -220,6 +233,8 @@
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
       ctx.filter = getCssFilter(filterSelect.value);
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       return canvas.toDataURL('image/png');
     }
@@ -254,16 +269,8 @@
       const orientation = framesSelect.value;
       const gap = 10;
       const border = 14;
-
-      let width, height;
-
-      if (orientation === 'classic') {
-        width = 340;
-        height = 300;
-      } else {
-        width = 340;
-        height = 300;
-      }
+      let width = 340;
+      let height = 300;
 
       const canvasWidth = orientation === 'classic'
         ? (width * totalPhotos + gap * (totalPhotos - 1) + border * 2)
@@ -286,7 +293,6 @@
         const img = new Image();
         img.src = src;
         img.onload = () => {
-          ctx.filter = getCssFilter(filterSelect.value);
           if (orientation === 'classic') {
             ctx.drawImage(img, border + i * (width + gap), border, width, height);
           } else {
