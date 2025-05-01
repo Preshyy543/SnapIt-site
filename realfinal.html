@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Polaroid Photo Booth</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap');
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: url("finalbg.png") no-repeat center center fixed;
+      background-size: cover;
+      color: #3a2e2e;
+      margin: 0;
+      padding-bottom: 120px;
+      position: relative;
+    }
+
+    h2 {
+      margin: 100px auto 0 auto;
+      text-align: center;
+      color: #3a2e2e;
+      font-weight: 500;
+    }
+
+    #video {
+      display: block;
+      margin: 70px auto 0 auto;
+      max-width: 540px;
+      width: 100%;
+      border: 6px solid #a49188;
+      border-radius: 14px;
+      background: #392208;
+      transform: scaleX(-1);
+    }
+
+    #countdown {
+      font-size: 60px;
+      font-weight: bold;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #302c2c;
+      z-index: 999;
+    }
+
+    #controls {
+      position: fixed;
+      left: 50%;
+      bottom: 0;
+      transform: translateX(-50%);
+      display: flex;
+      flex-wrap: nowrap;
+      justify-content: center;
+      gap: 12px;
+      background: rgba(87, 58, 35, 0.95);
+      border-radius: 18px;
+      padding: 14px 28px;
+      box-shadow: 0 6px 24px rgba(139, 94, 60, 0.18);
+      max-width: 95vw;
+      z-index: 1000;
+    }
+
+    #controls select,
+    #controls input,
+    #controls button {
+      font-family: 'Poppins', sans-serif;
+      font-size: 10px;
+      padding: 8px 15px;
+      border-radius: 10px;
+      border: 1px solid #d8c3b0;
+      background: #fffaf6;
+      color: #7a5c38;
+      transition: 0.2s;
+    }
+
+    #controls button {
+      background-color: #b08968;
+      color: #fffaf6;
+      font-weight: bold;
+    }
+
+    #controls button:hover {
+      background-color: #7a5c38;
+      color: #fffaf6;
+      transform: scale(1.08);
+      box-shadow: 0 4px 16px #b08968;
+    }
+
+    button:disabled {
+      background-color: #888;
+      cursor: not-allowed;
+    }
+
+    #cameraImg {
+      display: block;
+      margin: 1px auto;
+      width: 700px;
+      max-width: 80%;
+    }
+
+    #finalsImageContainer {
+      display: none;
+      position: relative;
+      margin: 60px auto 20px auto;
+      width: auto;
+      max-width: 100%;
+      flex-direction: column;
+      align-items: center;
+      animation: slideDown 1.5s cubic-bezier(.68,-0.55,.27,1.55);
+      z-index: 11;
+    }
+
+    @keyframes slideDown {
+      0% { opacity: 0; transform: translateY(-100px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    #finalsImage {
+      width: auto;
+      max-width: 90vw;
+      height: auto;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(139, 94, 60, 0.15), 0 10px 20px #e6d3c2;
+      border: 3px solid #d8c3b0;
+      margin-top: 10px;
+    }
+
+    #flash {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: white;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 1001;
+      transition: opacity 0.3s ease-out;
+    }
+  </style>
+</head>
+<body>
+  <h2>Pose, Click, and Pick Your Pic</h2>
+
+  <div id="cameraArea">
+    <video id="video" autoplay playsinline></video>
+    <img id="cameraImg" src="preshy.png" alt="Polaroid camera">
+    <div id="countdown"></div>
+    <div id="finalsImageContainer">
+      <img id="finalsImage" alt="Final photo-strip image"/>
+    </div>
+  </div>
+
+  <div id="controls">
+    <label for="filterSelect">Filters</label>
+    <select id="filterSelect">
+      <option value="none">None</option>
+      <option value="sepia">Sepia</option>
+      <option value="grayscale">Grayscale</option>
+      <option value="vintage">Vintage</option>
+      <option value="warm">Warm</option>
+    </select>
+
+    <label for="framesSelect">Frames</label>
+    <select id="framesSelect">
+      <option value="classic">Classic (Horizontal)</option>
+      <option value="polaroid">Polaroid (Vertical)</option>
+    </select>
+
+    <input type="text" id="captionInput" placeholder="Add a caption">
+    <input type="color" id="bgColor" value="#fffaf6">
+    <button onclick="applyDesign()">Apply Design</button>
+    <button id="clckBtn">Start Capture</button>
+    <button id="dwnldBth" disabled>Download Photo-Strip</button>
+  </div>
+
+  <div id="flash"></div>
+
+  <script>
+    const video = document.getElementById('video');
+    const countdownEl = document.getElementById('countdown');
+    const clckBtn = document.getElementById('clckBtn');
+    const dwnldBth = document.getElementById('dwnldBth');
+    const finalsImage = document.getElementById('finalsImage');
+    const finalsImageContainer = document.getElementById('finalsImageContainer');
+    const filterSelect = document.getElementById('filterSelect');
+    const framesSelect = document.getElementById('framesSelect');
+    const captionInput = document.getElementById('captionInput');
+    const bgColor = document.getElementById('bgColor');
+
+    let stream = null;
+    let photos = [];
+    const totalPhotos = 4;
+
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+      } catch (error) {
+        alert('Webcam access error: ' + error.message);
+      }
+    }
+
+    function getCssFilter(filter) {
+      switch (filter) {
+        case 'sepia': return 'sepia(60%)';
+        case 'grayscale': return 'grayscale(90%)';
+        case 'vintage': return 'contrast(0.8) saturate(0.8) sepia(0.4)';
+        case 'warm': return 'brightness(1.1) sepia(0.2) saturate(1.5)';
+        default: return 'none';
+      }
+    }
+
+    function capturePhoto() {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.filter = getCssFilter(filterSelect.value);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/png');
+    }
+
+    function triggerFlash() {
+      const flash = document.getElementById('flash');
+      flash.style.opacity = '1';
+      setTimeout(() => {
+        flash.style.opacity = '0';
+      }, 150);
+    }
+
+    async function countdown(seconds) {
+      return new Promise(resolve => {
+        let current = seconds;
+        countdownEl.textContent = current;
+        const interval = setInterval(() => {
+          current--;
+          if (current > 0) {
+            countdownEl.textContent = current;
+          } else {
+            clearInterval(interval);
+            countdownEl.textContent = '';
+            triggerFlash();
+            resolve();
+          }
+        }, 1000);
+      });
+    }
+
+    function composeFinalImage() {
+      const orientation = framesSelect.value;
+      const gap = 10;
+      const border = 14;
+
+      let width, height;
+
+      if (orientation === 'classic') {
+        width = 340;
+        height = 300;
+      } else {
+        width = 340;
+        height = 300;
+      }
+
+      const canvasWidth = orientation === 'classic'
+        ? (width * totalPhotos + gap * (totalPhotos - 1) + border * 2)
+        : (width + border * 2);
+
+      const canvasHeight = orientation === 'classic'
+        ? (height + border * 2 + 50)
+        : (height * totalPhotos + gap * (totalPhotos - 1) + border * 2 + 50);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = bgColor.value;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      let imagesLoaded = 0;
+      photos.forEach((src, i) => {
+        const img = new Image();
+        img.src = src;
+        img.onload = () => {
+          ctx.filter = getCssFilter(filterSelect.value);
+          if (orientation === 'classic') {
+            ctx.drawImage(img, border + i * (width + gap), border, width, height);
+          } else {
+            ctx.drawImage(img, border, border + i * (height + gap), width, height);
+          }
+
+          imagesLoaded++;
+          if (imagesLoaded === photos.length) {
+            ctx.font = "500 18px 'Poppins', sans-serif";
+            ctx.fillStyle = "#3a2e2e";
+            ctx.textAlign = "center";
+            const caption = captionInput.value;
+            if (caption) {
+              ctx.fillText(caption, canvas.width / 2, canvas.height - 20);
+            }
+            finalsImage.src = canvas.toDataURL('image/png');
+            finalsImageContainer.style.display = 'flex';
+            dwnldBth.disabled = false;
+          }
+        };
+      });
+    }
+
+    async function startCapture() {
+      photos = [];
+      finalsImageContainer.style.display = 'none';
+      clckBtn.disabled = true;
+
+      for (let i = 0; i < totalPhotos; i++) {
+        await countdown(3);
+        photos.push(capturePhoto());
+      }
+
+      composeFinalImage();
+      clckBtn.disabled = false;
+    }
+
+    function downloadStrip() {
+      const a = document.createElement('a');
+      a.href = finalsImage.src;
+      a.download = 'photo-strip.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    function applyDesign() {
+      composeFinalImage();
+    }
+
+    startCamera();
+    clckBtn.addEventListener('click', startCapture);
+    dwnldBth.addEventListener('click', downloadStrip);
+  </script>
+</body>
+</html>
